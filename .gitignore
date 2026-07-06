@@ -217,6 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# data 
+data/scans
+config/sp500.csv 
+
 
 #Others 
-info.md
+info.md 
