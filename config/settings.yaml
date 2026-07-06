@@ -1,0 +1,5 @@
+scanner:
+  rsi_oversold: 30
+  rsi_overbought: 70
+  min_signals: 0
+  top_k: 5
