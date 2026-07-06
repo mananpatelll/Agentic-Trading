@@ -2,7 +2,7 @@ import pandas as pd
 
 
 def rsi(close: pd.Series, period: int = 14) -> pd.Series:
-    """Calculate RSI values for given stock"""
+    """Relative Strength Index using Wilder's smoothing (0-100)."""
     delta = close.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -15,15 +15,29 @@ def rsi(close: pd.Series, period: int = 14) -> pd.Series:
 
 
 def sma(close: pd.Series, period: int) -> pd.Series:
-    """calculate SMA"""
-    pass
+    """Simple moving average over `period` bars."""
+    return close.rolling(period).mean()
 
 
-def near_52(close: pd.Series) -> float:
-    """calculate 52week high """
-    pass
+def volume_spike(volume: pd.Series, period: int = 20, mult: float = 2.0) -> bool:
+    """True if latest volume >= `mult` * average volume of previous `period` bars."""
+    avg = volume.rolling(period).mean().shift(1)
+    return bool(volume.iloc[-1] >= mult * avg.iloc[-1])
 
 
-def low_52w(close: pd.Series) -> float:
-    """calculate 52 week low"""
-    pass
+def pct_from_52w_high(close: pd.Series) -> float:
+    """% distance from 252-day high (negative = below high)."""
+    high_52w = close.rolling(252, min_periods=200).max()
+    # e.g. -3.2 = 3.2 % below
+    return float((close.iloc[-1] / high_52w.iloc[-1] - 1) * 100)
+
+
+def pct_from_52w_low(close: pd.Series) -> float:
+    """% distance from 252-day low (positive = above low)."""
+    low_52w = close.rolling(252, min_periods=200).min()
+    return float((close.iloc[-1] / low_52w.iloc[-1] - 1) * 100)
+
+
+def avg_dollar_volume(close: pd.Series, volume: pd.Series, period: int = 20) -> float:
+    """Average daily dollar volume (close * volume) over `period` days."""
+    return float((close * volume).rolling(period).mean().iloc[-1])

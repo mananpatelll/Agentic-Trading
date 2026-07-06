@@ -1,5 +1,7 @@
 scanner:
+  min_dollar_volume: 20000000 
   rsi_oversold: 30
   rsi_overbought: 70
-  min_signals: 0
+  vol_spike_mult: 2.0
+  min_signals: 1
   top_k: 5
