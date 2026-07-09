@@ -25,6 +25,12 @@ def volume_spike(volume: pd.Series, period: int = 20, mult: float = 2.0) -> bool
     return bool(volume.iloc[-1] >= mult * avg.iloc[-1])
 
 
+def volume_ratio(volume: pd.Series, period: int = 20) -> float:
+    """Returns volume spike in"""
+    avg = volume.rolling(period).mean().shift(1)
+    return float(volume.iloc[-1] / avg.iloc[-1])
+
+
 def pct_from_52w_high(close: pd.Series) -> float:
     """% distance from 252-day high (negative = below high)."""
     high_52w = close.rolling(252, min_periods=200).max()
