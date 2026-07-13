@@ -1,6 +1,7 @@
 from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, START, END
 from agents.technical_agent import technical_node
+from agents.news_agent import news_node
 from indicators import *
 from scanner import fetch_daily_bars, load_config
 
@@ -8,6 +9,7 @@ from scanner import fetch_daily_bars, load_config
 class AgentState(TypedDict):
     symbol: dict
     market_snapshot: dict
+    market_outlook: dict
     technical_outlook: dict
     news_outlook: dict
     events_outlook: dict
@@ -37,7 +39,9 @@ def build_graph():
     graph = StateGraph(AgentState)
     graph.add_node("load_data", load_data)
     graph.add_node("techincal", technical_node)
+    graph.add_node("news_agent", news_node)
     graph.add_edge(START, "load_data")
     graph.add_edge("load_data", "techincal")
-    graph.add_edge("techincal", END)
+    graph.add_edge("techincal", "news_agent")
+    graph.add_edge("news_agent", END)
     return graph.compile()

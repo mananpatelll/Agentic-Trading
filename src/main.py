@@ -1,11 +1,9 @@
 import sys
 import glob
-import uuid
-from datetime import datetime
 import pandas as pd
-from langchain_core.messages import HumanMessage
 from graph import build_graph
-from journal import log_decision, log_summary
+from journal import log_decision
+from agents.market_agent import analyze_market
 
 
 def scan_csv() -> str:
@@ -21,18 +19,18 @@ def load_candidates(path: str) -> list[dict]:
 
 
 def run():
+    market_outlook = analyze_market().model_dump()
+    print(
+        f"\n MARKET : {market_outlook['regime']} ({market_outlook['confidence']}) \n")
     app = build_graph()
     candidates = load_candidates(scan_csv())
     print(F"Loaded {len(candidates)} candidates from today's scan")
     for c in candidates:
         print(f"Analyzing {c}")
         symbol = c["symbol"]
-        result = app.invoke({"symbol": symbol})
-        log_decision(
-            symbol, c["signals"], result["market_snapshot"], result["technical_outlook"])
-        log_summary(symbol, result["technical_outlook"])
-        print(f"{symbol}: {result['technical_outlook']['direction']} "
-              f"({result['technical_outlook']['confidence']})")
+        result = app.invoke(
+            {"symbol": symbol, "market_outlook": market_outlook})
+        log_decision(result)
 
 
 if __name__ == "__main__":
