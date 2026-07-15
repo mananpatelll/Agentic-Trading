@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 from typing import Literal, Optional
 from langchain_openai import ChatOpenAI
-from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 
@@ -48,7 +47,6 @@ def format_snapshot(snap: dict) -> str:
         f"Volume: {snap['vol_ratio']:.1f}x the 20-day average\n"
         f"Distance from 52-week high: {snap['pct_from_52w_high']:+.1f}%\n"
         f"Distance from 52-week low: {snap['pct_from_52w_low']:+.1f}%\n"
-        f"Scanner signals fired: {snap['scan_signals']}"
     )
 
 
