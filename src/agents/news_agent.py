@@ -9,7 +9,7 @@ from langchain_tavily import TavilySearch
 load_dotenv()
 
 search_tool = TavilySearch(max_results=5)
-model = ChatOpenAI(model="gpt-4o")
+model = ChatOpenAI(model="gpt-4.1-2025-04-14")
 
 
 class NewsOutlook(BaseModel):
@@ -49,4 +49,4 @@ def news_node(state: dict) -> dict:
         # hard cap under the prompt's soft cap
         config={"recursion_limit": 8},
     )
-    return {"news_outlook": result["structured_response"]}
+    return {"news_outlook": result["structured_response"].model_dump()}
