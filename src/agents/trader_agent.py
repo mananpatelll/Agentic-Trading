@@ -1,8 +1,34 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
+from risk_gate import run_risk_gate
+from langchain_core.tools import tool
+from langchain.agents import create_agent
 
 model = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0)
+
+
+@tool
+def risk_gate(entry: float, stop: float, target: float, action: str) -> str:
+    """"
+    Validate a proposed trade against risk rules.
+    Parameters:
+    - entry: the proposed entry price
+    - stop: the stop loss price
+    - target: the profit target price
+    - action: 'buy' or 'sell_short'
+    Returns:
+    - "PASS" if all checks pass
+    - "FAIL: <detailed reason>" if any check fails, explaining what's wrong and how to fix it.
+    """
+    proposal = {"entry": entry, "stop": stop,
+                "target": target, "action": action}
+    result = run_risk_gate(state={"proposal": proposal})
+    rg = result["risk_gate"]
+    if rg["passed"]:
+        return "Risk Gate PASSED"
+    else:
+        return f"FAIL: {rg['reason']}"
 
 
 class Proposal(BaseModel):
@@ -45,7 +71,6 @@ Your job is to synthesize the analysts' conclusions into exactly one action:
 - no_trade
 
 Rules:
-
 1. The market regime determines whether long or short trades are appropriate.
 2. The technical outlook is the primary directional signal.
 3. News adjusts conviction. Material news that clearly invalidates the technical thesis should result in no_trade.
@@ -53,19 +78,40 @@ Rules:
 5. Choose no_trade only when the evidence is conflicting, confidence is too low, or risk controls prohibit a trade.
 6. Entry should be near the current price.
 7. Stops must be placed using technical levels from the provided data.
-8. Target must provide at least a 1.5:1 reward-to-risk ratio.
-9. Never invent evidence. Cite only analyst statements."""
+8. Target must provide at least a  reward-to-risk ratio.
+9. Never invent evidence. Cite only analyst statements.
+
+RISK‑GATE TOOL (MANDATORY):
+
+Before finalising a buy or sell_short, you MUST call the tool `risk_gate` with your planned entry, stop, target, and action.
+- If the tool returns "PASS": you may output your final decision.
+- If the tool returns a message starting with "FAIL": carefully read the reason, adjust your prices (entry, stop, target) to fix the problem, and call the tool again.
+- Do NOT finalise a trade without a successful tool call.
+- Do NOT guess the risk rules – rely only on the tool results.
+
+
+"""
+
+trader_agent = create_agent(
+    model=model,
+    tools=[risk_gate],
+    response_format=Proposal,
+    system_prompt=MANDATE,
+)
 
 
 def propose(state: dict) -> Proposal:
-    prompt = f"{MANDATE}\n\n{format_desk_view(state)}\n\nYour decision:"
-    return model.with_structured_output(Proposal).invoke(prompt)
+    prompt = f"\n\n{format_desk_view(state)}\n\nWhat is your decision:"
+    return trader_agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 
 
 def trader_node(state: dict) -> dict:
     try:
         proposal = propose(state)
+        print(f"\n\nTrader agent decision : {proposal}\n\n")
+        proposal_dict = proposal["structured_response"].model_dump()
     except Exception as e:
         proposal = Proposal(action="no_trade",
                             rationale=f"trader error: {e}", evidence_cited=[])
-    return {"proposal": proposal.model_dump()}
+        proposal_dict = proposal.model_dump()
+        return {"proposal": proposal_dict}
