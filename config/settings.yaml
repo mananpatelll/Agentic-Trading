@@ -3,5 +3,10 @@ scanner:
   rsi_oversold: 30
   rsi_overbought: 70
   vol_spike_mult: 2.0
-  min_signals: 1
+  min_signals: 2
   top_k: 5
+
+
+Risk: 
+  min_rr_ratio: 1.5 
+  max_trades_per_day: 5 
