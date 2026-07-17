@@ -8,18 +8,13 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import Adjustment
-
+from load_config import load_config
 load_dotenv()
 ALPACA_API_KEY = os.getenv("APCA-API-KEY-ID")
 ALPACA_SECRET_KEY = os.getenv("APCA-API-SECRET-KEY")
 output_dir = "data/scans"
 
 os.makedirs(output_dir, exist_ok=True)
-
-
-def load_config(path="config/settings.yaml") -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)["scanner"]
 
 
 def fetch_daily_bars(symbols: list[str], lookback_days: int = 420) -> pd.DataFrame:
