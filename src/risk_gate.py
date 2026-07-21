@@ -5,7 +5,7 @@ CFG = CFG.get("Risk", {})
 print("CFG contents:", CFG)
 
 
-def rr_ratio(entry: float, stop: float, target: float, action: str, cfg=None) -> bool:
+def rr_ratio(entry: float, stop: float, target: float, action: str, cfg=None) -> tuple[bool, str]:
     if cfg is None:
         cfg = CFG
     min_rr = cfg["min_rr_ratio"]
@@ -49,7 +49,7 @@ def run_risk_gate(state: dict, cfg=None) -> dict:
         return {"risk_gate": {
             "passed": False,
             "reason": f"Missing required fields in proposal : {','.join(missing)}",
-            "cehcks": {}
+            "checks": {}
         }}
     checks = {}
     reasons = []
