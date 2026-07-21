@@ -16,7 +16,7 @@ class AgentState(TypedDict):
     news_outlook: dict
     events_outlook: dict
     proposal: dict
-    risk_check: dict
+    risk_gate: dict
 
 
 cfg = load_config()
