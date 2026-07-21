@@ -114,4 +114,4 @@ def trader_node(state: dict) -> dict:
         proposal = Proposal(action="no_trade",
                             rationale=f"trader error: {e}", evidence_cited=[])
         proposal_dict = proposal.model_dump()
-        return {"proposal": proposal_dict}
+    return {"proposal": proposal_dict}
