@@ -5,6 +5,7 @@ from agents.news_agent import news_node
 from agents.trader_agent import trader_node
 from indicators import *
 from scanner import fetch_daily_bars, load_config
+from risk_gate import run_risk_gate
 
 
 class AgentState(TypedDict):
@@ -15,6 +16,7 @@ class AgentState(TypedDict):
     news_outlook: dict
     events_outlook: dict
     proposal: dict
+    risk_check: dict
 
 
 cfg = load_config()
@@ -37,15 +39,26 @@ def load_data(state: AgentState) -> AgentState:
     return {"market_snapshot": snapshot}
 
 
+def risk_gate_router(state: AgentState) -> str:
+    print("At the router")
+    print(
+        f"{"risk_gate" if state["proposal"]["action"] != "no_trade" else "skip"}")
+    return "risk_gate" if state["proposal"]["action"] != "no_trade" else "skip"
+
+
 def build_graph():
     graph = StateGraph(AgentState)
     graph.add_node("load_data", load_data)
     graph.add_node("technical", technical_node)
     graph.add_node("news_agent", news_node)
     graph.add_node("trader_agent", trader_node)
+    graph.add_node("risk_gate", run_risk_gate)
+
     graph.add_edge(START, "load_data")
     graph.add_edge("load_data", "technical")
     graph.add_edge("technical", "news_agent")
     graph.add_edge("news_agent", "trader_agent")
-    graph.add_edge("trader_agent", END)
+    graph.add_conditional_edges("trader_agent", risk_gate_router, {
+                                "risk_gate": "risk_gate", "skip": END})
+    graph.add_edge("risk_gate", END)
     return graph.compile()
