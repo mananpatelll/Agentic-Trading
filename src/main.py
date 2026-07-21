@@ -1,6 +1,9 @@
 import sys
 import glob
 import pandas as pd
+from datetime import datetime
+from langgraph.types import Command
+
 from graph import build_graph
 from journal import log_decision
 from agents.market_agent import analyze_market
@@ -25,11 +28,29 @@ def run():
     app = build_graph()
     candidates = load_candidates(scan_csv())
     print(F"Loaded {len(candidates)} candidates from today's scan")
+
     for c in candidates:
+
         print(f"Analyzing {c}")
         symbol = c["symbol"]
+        config = {"configurable": {
+            "thread_id": f"{symbol}-{datetime.now():%Y%m%d}"}}
         result = app.invoke(
-            {"symbol": symbol, "market_outlook": market_outlook})
+            {"symbol": symbol, "market_outlook": market_outlook}, config)
+        if "__interrupt__" in result:
+            payload = result["__interrupt__"][0].value
+            print(f"\n=== PROPOSED: {payload['symbol']} ===")
+            print(payload["proposal"])
+            print("technical:", payload["technical"]
+                  ["direction"], payload["technical"]["confidence"])
+            print("news:", payload["news"]["direction"],
+                  "| regime:", payload["regime"])
+            choice = input("approve / reject: ").strip().lower()
+            while choice not in ("approve", "reject"):      # validate OUTSIDE the graph
+                choice = input("type 'approve' or 'reject': ").strip().lower()
+
+            result = app.invoke(Command(resume=choice),
+                                config)   # same thread_id
         log_decision(result)
 
 
