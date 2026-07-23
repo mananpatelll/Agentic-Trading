@@ -3,7 +3,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
+from langchain_openai import ChatOpenAI
 
+model = ChatOpenAI(model="gpt-4o", max_retries=3)
 search_tool = TavilySearch(max_results=10, topic="news",
                            time_range="week")  # recency locked
 
@@ -34,7 +36,7 @@ RULES:
 - All fields are required, if nothing found explain why it failed  in summary and write none in key risk, confidence and regime None
 """
 
-market_agent = create_agent(model="openai:gpt-4o", tools=[search_tool],
+market_agent = create_agent(model=model, tools=[search_tool],
                             response_format=MarketOutlook, system_prompt=MANDATE)
 
 

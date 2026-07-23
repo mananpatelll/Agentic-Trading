@@ -5,7 +5,7 @@ from risk_gate import run_risk_gate
 from langchain_core.tools import tool
 from langchain.agents import create_agent
 
-model = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0)
+model = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0, max_retries=3)
 
 
 @tool

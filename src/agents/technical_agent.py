@@ -5,8 +5,7 @@ from pydantic import BaseModel, Field
 
 
 load_dotenv()
-
-model = ChatOpenAI(model="gpt-4o")
+model = ChatOpenAI(model="gpt-4o", max_retries=3)
 
 
 class Technical_outlook(BaseModel):

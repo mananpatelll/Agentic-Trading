@@ -9,7 +9,7 @@ from langchain_tavily import TavilySearch
 load_dotenv()
 
 search_tool = TavilySearch(max_results=5)
-model = ChatOpenAI(model="gpt-4.1-2025-04-14")
+model = ChatOpenAI(model="gpt-4.1-2025-04-14", max_retries=3)
 
 
 class NewsOutlook(BaseModel):
