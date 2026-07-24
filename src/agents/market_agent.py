@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, Field
@@ -5,6 +7,8 @@ from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
 from langchain_openai import ChatOpenAI
 
+
+MARKET_DIR = Path("data/market")
 model = ChatOpenAI(model="gpt-4o", max_retries=3)
 search_tool = TavilySearch(max_results=10, topic="news",
                            time_range="week")  # recency locked
@@ -45,4 +49,16 @@ def analyze_market() -> MarketOutlook:
            f"Assess current market conditions for the coming trading week.")
     result = market_agent.invoke({"messages": [{"role": "user", "content": msg}]},
                                  config={"recursion_limit": 10})
-    return result["structured_response"]
+    return result["structured_response"].model_dump()
+
+
+def get_market_outlook() -> dict:
+    MARKET_DIR.mkdir(parents=True, exist_ok=True)
+    # Check if already exist
+    cache = MARKET_DIR / f"{datetime.now():%Y-%m-%d}.json"
+    if cache.exists():
+        print("loading market outlook frrom cache")
+        return json.loads(cache.read_text())
+    outlook = analyze_market()  # if does not exists, anaylze it once per day
+    cache.write_text(json.dumps(outlook, default=str))
+    return outlook
