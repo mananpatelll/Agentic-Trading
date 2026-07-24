@@ -55,14 +55,7 @@ def risk_gate_router(state: AgentState) -> str:
 
 
 def approval_node(state: AgentState) -> dict:
-    decision = interrupt({
-        "symbol": state["symbol"],
-        "proposal": state["proposal"],
-        "risk_gate": state["risk_gate"],
-        "technical": state["technical_outlook"],
-        "news": state["news_outlook"],
-        "regime": state["market_outlook"]["regime"],
-    })
+    decision = interrupt("awaiting_human_approval")
     return {"decision": decision}
 
 
