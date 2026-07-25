@@ -5,11 +5,10 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
-from langchain_openai import ChatOpenAI
-
+from llm import get_model
 
 MARKET_DIR = Path("data/market")
-model = ChatOpenAI(model="gpt-4o", max_retries=3)
+model = get_model("market")
 search_tool = TavilySearch(max_results=10, topic="news",
                            time_range="week")  # recency locked
 

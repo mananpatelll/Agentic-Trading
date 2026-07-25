@@ -1,15 +1,12 @@
 from datetime import datetime
 from typing import Literal
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
-
-load_dotenv()
+from llm import get_model
 
 search_tool = TavilySearch(max_results=5)
-model = ChatOpenAI(model="gpt-4.1-2025-04-14", max_retries=3)
+model = get_model("news")
 
 
 class NewsOutlook(BaseModel):
