@@ -1,11 +1,11 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
 from risk_gate import run_risk_gate
 from langchain_core.tools import tool
 from langchain.agents import create_agent
+from llm import get_model
 
-model = ChatOpenAI(model="gpt-5-mini-2025-08-07", temperature=0, max_retries=3)
+model = get_model("trader")
 
 
 @tool

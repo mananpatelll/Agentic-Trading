@@ -1,11 +1,9 @@
-from dotenv import load_dotenv
 from typing import Literal, Optional
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+from llm import get_model
 
 
-load_dotenv()
-model = ChatOpenAI(model="gpt-4o", max_retries=3)
+model = get_model("technical")
 
 
 class Technical_outlook(BaseModel):
