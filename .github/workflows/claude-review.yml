@@ -1,0 +1,66 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Least privilege: the reviewer reads code and writes verdicts, nothing else.
+# Deliberately NOT contents:write — a reviewer must never be able to push.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# A new push supersedes the review in flight; don't pay for both.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, so the diff against base resolves
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} of ${{ github.repository }}.
+
+            Read the diff with `gh pr diff ${{ github.event.pull_request.number }}`.
+            Read the surrounding code with Read/Grep/Glob before judging anything —
+            a diff alone does not tell you whether a call site still holds.
+
+            This repo is an LLM trading desk built on LangGraph. Judge correctness
+            in this priority order and ignore formatting and style preferences:
+
+              1. Anything that stops execution: syntax errors, NameError/KeyError,
+                 bad imports, unhandled exceptions on the happy path.
+              2. Concurrency hazards: shared mutable state across graph nodes,
+                 races on lazily-initialised globals, unsafe use of the sqlite
+                 checkpointer or the shared LLM clients in src/llm.py.
+              3. Logic errors in trading or risk code, where a silently wrong
+                 number is worse than a crash.
+
+            Watch for exceptions swallowed by a broad `except` that turn a real
+            bug into a plausible-looking no_trade.
+
+            Then post exactly ONE verdict, and nothing else:
+              - Nothing found in categories 1-3:
+                  gh pr review ${{ github.event.pull_request.number }} --approve --body "<summary>"
+              - Otherwise:
+                  gh pr review ${{ github.event.pull_request.number }} --request-changes --body "<findings>"
+
+            Start the body with "## 🤖 Reviewed by Claude" and keep it under 30
+            lines. Cite every finding as `path/file.py:line`. If you approve, state
+            what you actually verified — never approve with an empty or vague body.
+          claude_args: |
+            --model claude-sonnet-5
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
