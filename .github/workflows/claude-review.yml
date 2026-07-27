@@ -69,7 +69,12 @@ jobs:
 
       # Plain shell, not the model: Claude renders the verdict, this acts on it.
       # An approval it did not actually give cannot merge anything.
+      #
+      # Owner's PRs only. Contributors still get the full review above; their
+      # PRs just wait for a human to press merge. The repo is public, so code
+      # from outside must not reach main unseen.
       - name: Merge when approved
+        if: github.event.pull_request.user.login == github.repository_owner
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
