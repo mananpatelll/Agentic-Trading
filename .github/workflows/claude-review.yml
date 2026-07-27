@@ -4,10 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# Least privilege: the reviewer reads code and writes verdicts, nothing else.
-# Deliberately NOT contents:write — a reviewer must never be able to push.
+# contents:write is needed by the merge step only. Claude's own tool list
+# stays read-only (see --allowedTools), so the model can never write here:
+# it renders a verdict, and the deterministic step below acts on it.
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
   id-token: write # OIDC token the action exchanges for its GitHub App token
@@ -65,3 +66,25 @@ jobs:
             --model claude-sonnet-5
             --max-turns 20
             --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
+
+      # Plain shell, not the model: Claude renders the verdict, this acts on it.
+      # An approval it did not actually give cannot merge anything.
+      - name: Merge when approved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # The review lands during the step above; allow for API propagation.
+          for i in 1 2 3; do
+            decision=$(gh pr view "$PR" --json reviewDecision --jq '.reviewDecision')
+            [ -n "$decision" ] && break
+            sleep 5
+          done
+          echo "review decision: ${decision:-<none>}"
+
+          if [ "$decision" != "APPROVED" ]; then
+            echo "Not approved — leaving open for a human."
+            exit 0
+          fi
+
+          gh pr merge "$PR" --merge --delete-branch
