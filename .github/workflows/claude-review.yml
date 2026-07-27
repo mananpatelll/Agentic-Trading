@@ -10,6 +10,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write # OIDC token the action exchanges for its GitHub App token
 
 # A new push supersedes the review in flight; don't pay for both.
 concurrency:
