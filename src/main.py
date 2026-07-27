@@ -56,58 +56,94 @@ def get_decision() -> str:
     return choice
 
 
+def thread_config(symbol: str, unique: bool = False) -> dict:
+    """One thread per symbol per day, so re running the same scan resumes rather than starting over. 'unique' appends the time to force a brand-new thread when the user chooses to re-analyze an already finished candidate."""
+    if unique:
+        stamp = f"{datetime.now():%Y%m%d-%H%M%S}"
+    else:
+        stamp = f"{datetime.now():%Y%m%d}"
+    return {"configurable": {"thread_id": f"{symbol}-{stamp}"}}
+
+
+def ask_yes_no(question: str) -> bool:
+    choice = input(f"{question} [yes/no]: ").strip().lower()
+    while choice not in ("yes", "no"):
+        choice = input("types 'yes' or 'no' : ").strip().lower()
+    return choice == "yes"
+
+
+def preflight(app, candidates: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Phase 0 - settle every human decision before any concurrency starts.
+
+    Returns (to_analyze, to_review). Touches no network and no LLM: it only
+    reads checkpoint state and asks the user questions.
+    """
+    to_analyze: list[dict] = []
+    to_review: list[dict] = []
+
+    for c in candidates:
+        symbol = c["symbol"]
+        config = thread_config(symbol)
+        status, _ = thread_status(app, config)
+
+        if status == "done":
+            if not ask_yes_no(f"{symbol}: Already analyzed today, Do you want to analyze again?"):
+                print(f"skipping {symbol}")
+                continue
+            # A finished thread can not re-run, so give it a new id and status
+            print("re-analyzing with a fresh thread")
+            config = thread_config(symbol, unique=True)
+            status = "fresh"
+
+        if status == "awaiting_approval":
+            to_review.append({"symbol": symbol, "config": config})
+        else:  # fresh | interrupted
+            if status == "interrupted":
+                print(f"{symbol}: previous run died mid-execution, re-running")
+            to_analyze.append({"symbol": symbol, "config": config})
+
+    return to_analyze, to_review
+
+
 def run() -> None:
-    market_outlook = None
     app = build_graph()
     candidates = load_candidates(scan_csv())
     print(F"Loaded {len(candidates)} candidates from today's scan")
 
-    for c in candidates:
+    # ---- Phase 0: pre-flight -------------------------------------------
+    to_analyze, to_review = preflight(app, candidates)
 
-        symbol = c["symbol"]
-        config = {"configurable": {
-            "thread_id": f"{symbol}-{datetime.now():%Y%m%d}"}}
-        status, snap = thread_status(app, config)
+    if not to_analyze and not to_review:
+        print("Nothing to do.")
+        return
 
-        if status == "done":
-            print(
-                f" {symbol}: Already analyzed today, Do you want to analyze again?")
-            choice = input("yes/no: ").strip().lower()
-            while choice not in ("yes", "no"):
-                choice = input("types 'yes' or 'no' ").strip().lower()
-            if choice == "no":
-                print(f"skipping {symbol}")
-                continue
-            else:
-                print("re-analyzing with a fresh thread")
-                config = {"configurable": {
-                    "thread_id": f"{symbol}-{datetime.now():%Y%m%d-%H%M%S}"}}
-                status = "fresh"
-        elif status == "awaiting_approval":  # If graph paused due to pending human approval
-            display_proposal(snap.values)
-            result = app.invoke(Command(resume=get_decision()), config)
+    market_outlook = None
+    if to_analyze:
+        # Fetched exactly once, before any worker starts. Every worker is
+        # handed this same dict, so nothing lazily initializes shared state.
+        market_outlook = get_market_outlook()
+        print(
+            f"\nMARKET: {market_outlook['regime']} ({market_outlook['confidence']})\n")
+
+    print(
+        f"analyzing {len(to_analyze)} | {len(to_review)} already awaiting approval")
+
+    # ---- Phase 1: analysis (sequential for now) --------
+    for item in to_analyze:
+        print(f"Analyzing {item['symbol']}")
+        result = app.invoke(
+            {"symbol": item["symbol"], "market_outlook": market_outlook},
+            item["config"])
+
+        if "__interrupt__" in result:   # paused for approval, hand to Phase 2
+            to_review.append(item)
+        else:                           # no_trade or risk-gate rejected
             log_decision(result)
-            continue
 
-        if status in ("interrupted", "fresh"):
-            if market_outlook is None:
-                market_outlook = get_market_outlook()
-                print(
-                    f"\nMARKET: {market_outlook['regime']} ({market_outlook['confidence']})\n")
-
-            if status == "interrupted":
-                print(f"{symbol}: previous run died mid-execution, re-running")
-            else:
-                print(f"Fresh Analyzing {symbol}")
-
-            result = app.invoke(
-                {"symbol": symbol, "market_outlook": market_outlook},
-                config)
-
-        if "__interrupt__" in result:  # Fresh run that paused for approval
-            display_proposal(app.get_state(config).values)
-            result = app.invoke(Command(resume=get_decision()),
-                                config)   # same thread_id
+    # ---- Phase 2: review queue -----------------------------------------
+    for item in sorted(to_review, key=lambda i: i["symbol"]):
+        display_proposal(app.get_state(item["config"]).values)
+        result = app.invoke(Command(resume=get_decision()), item["config"])
         log_decision(result)
 
 
