@@ -106,11 +106,14 @@ def propose(state: dict) -> Proposal:
 
 
 def trader_node(state: dict) -> dict:
+    print(f"making trading decisons for {state['symbol']}")
     try:
         proposal = propose(state)
-        print(f"\n\nTrader agent decision : {proposal}\n\n")
         proposal_dict = proposal["structured_response"].model_dump()
+        print(
+            f"\n\nTrader agent decision : {proposal["structured_response"].action}\n\n")
     except Exception as e:
+        print(f"Error in trader agent {e}")
         proposal = Proposal(action="no_trade",
                             rationale=f"trader error: {e}", evidence_cited=[])
         proposal_dict = proposal.model_dump()
