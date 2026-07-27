@@ -12,10 +12,15 @@ models:
     trader:    {model: gpt-4.1-2025-04-14}
 
   # Shared by every agent in the process, so this caps TOTAL request rate.
-  # Uncomment when nodes start running in parallel and hitting provider limits.
-  # rate_limit:
-  #   requests_per_second: 2
-  #   max_bucket_size: 5
+  # Sized for a top_k=5 scan: the specialist fan-out bursts ~10 calls at once,
+  # then news tool-loops and trader risk-gate retries trail off, so a full run
+  # is roughly 20-45 requests. The bucket absorbs the opening burst; the rate
+  # covers the tail at ~180 req/min, well under the 500 RPM tier-1 ceiling.
+  # Lower requests_per_second if 429s appear (token-per-minute limits bind
+  # before request limits do on lower tiers).
+  rate_limit:
+    requests_per_second: 3
+    max_bucket_size: 10
 
 
 scanner:
