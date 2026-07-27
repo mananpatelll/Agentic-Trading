@@ -9,6 +9,7 @@ from llm import get_model
 
 MARKET_DIR = Path("data/market")
 model = get_model("market")
+print(f"model for market agent : {model.model_name}")
 search_tool = TavilySearch(max_results=10, topic="news",
                            time_range="week")  # recency locked
 

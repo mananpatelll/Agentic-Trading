@@ -4,6 +4,7 @@ from llm import get_model
 
 
 model = get_model("technical")
+print(f"model for technical agent : {model.model_name}")
 
 
 class Technical_outlook(BaseModel):
@@ -53,5 +54,7 @@ def analyze(snapshot: dict) -> Technical_outlook:
 
 
 def technical_node(state: dict) -> dict:
+    print(f"analyzing technical data for {state['symbol']}")
     outlook = analyze(state["market_snapshot"])
+    print(f"analyzed technical data for {state['symbol']}")
     return {"technical_outlook": outlook.model_dump()}
