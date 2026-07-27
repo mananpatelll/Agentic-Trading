@@ -94,9 +94,9 @@ def build_graph():
 
     graph.add_edge(START, "load_data")
     graph.add_edge("load_data", "technical")
-    graph.add_edge("technical", "news_agent")
+    graph.add_edge("load_data", "news_agent")
+    graph.add_edge("technical", "trader_agent")
     graph.add_edge("news_agent", "trader_agent")
-
     graph.add_conditional_edges("trader_agent", risk_gate_router, {
                                 "risk_gate": "risk_gate", "skip": END})
     graph.add_conditional_edges("risk_gate", approval_route, {
