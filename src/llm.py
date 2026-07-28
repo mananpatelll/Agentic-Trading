@@ -13,8 +13,15 @@ from typing import Any, Optional
 from dotenv import load_dotenv
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_openai import ChatOpenAI
+from openai import APIConnectionError, InternalServerError, RateLimitError
 
 from load_config import load_config
+
+# Failures worth waiting out and retrying, for callers that retry a whole
+# candidate. Deliberately NOT openai.APIError: that also covers permanent
+# failures (BadRequestError, AuthenticationError) where retrying only burns
+# the backoff and fails anyway. APITimeoutError subclasses APIConnectionError.
+TRANSIENT_API_ERRORS = (RateLimitError, InternalServerError, APIConnectionError)
 
 # Once, before any client is constructed — not per agent module.
 load_dotenv()
