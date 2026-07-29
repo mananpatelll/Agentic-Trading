@@ -62,10 +62,14 @@ jobs:
             Start the body with "## 🤖 Reviewed by Claude" and keep it under 30
             lines. Cite every finding as `path/file.py:line`. If you approve, state
             what you actually verified — never approve with an empty or vague body.
+          # Temporary: prints the tool calls so we can see which ones are being
+          # denied. Both review runs so far burned ~45% of their turns on
+          # denials. Remove once the allowlist is right.
+          show_full_output: true
           claude_args: |
             --model claude-sonnet-5
             --max-turns 20
-            --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
+            --allowedTools "Read,Grep,Glob,TodoWrite,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
 
       # Plain shell, not the model: Claude renders the verdict, this acts on it.
       # An approval it did not actually give cannot merge anything.
