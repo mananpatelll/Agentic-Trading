@@ -1,13 +1,18 @@
 import sys
 import glob
+import time
 from typing import Any
 import pandas as pd
 from datetime import datetime
 from langgraph.types import Command
+from llm import TRANSIENT_API_ERRORS
 
 from graph import build_graph
 from journal import log_decision
 from agents.market_agent import get_market_outlook
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from load_config import load_config
 
 
 def scan_csv() -> str:
@@ -105,6 +110,32 @@ def preflight(app, candidates: list[dict]) -> tuple[list[dict], list[dict]]:
     return to_analyze, to_review
 
 
+def analyze_candidate(app, item: dict, market_outlook: dict,
+                      attempts: int = 3) -> dict:
+    """Runs in a worker thread. One candidate start to finish.
+
+    Retries on 429. The waits are tens of seconds on purpose: a TPM limit
+    only clears when the rolling one-minute window rolls over, and the
+    OpenAI SDK's own backoff is sub-second - sized for request-rate spikes,
+    not for an exhausted token budget.
+    """
+    payload = {"symbol": item["symbol"], "market_outlook": market_outlook}
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return app.invoke(payload, item["config"])
+        except TRANSIENT_API_ERRORS:
+            if attempt == attempts:
+                raise
+            wait = 30 * attempt
+            print(f"{item['symbol']} : rate limited, retrying in {wait}s")
+            time.sleep(wait)
+            # Resume from the checkpoint rather than restarting. Nodes that
+            # already succeeded must not re-run and spend their tokens twice,
+            # which would only deepen the shortfall we're waiting out.
+            payload = None
+
+
 def run() -> None:
     app = build_graph()
     candidates = load_candidates(scan_csv())
@@ -128,17 +159,30 @@ def run() -> None:
     print(
         f"analyzing {len(to_analyze)} | {len(to_review)} already awaiting approval")
 
-    # ---- Phase 1: analysis (sequential for now) --------
-    for item in to_analyze:
-        print(f"Analyzing {item['symbol']}")
-        result = app.invoke(
-            {"symbol": item["symbol"], "market_outlook": market_outlook},
-            item["config"])
+    # ---- Phase 1: concurrent analysis ----------------------------------
+    workers = load_config().get("run", {}).get("max_workers", 3)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="cand") as pool:
+        # Map each future back to its candidate, so a failure is attributable
+        futures = {
+            pool.submit(analyze_candidate, app, item, market_outlook): item
+            for item in to_analyze
+        }
+        # as_completed yields futures in finishing order, not submission order
+        # THis loop body runs on the main thread, which is why to_review and log_decision need no lock.
+        for fut in as_completed(futures):
+            item = futures[fut]
+            try:
+                result = fut.result()
+            except Exception as e:
+                print(f"{item['symbol']} : analysis failed - {e}")
+                log_decision({"symbol": item["symbol"],
+                              "status": "failed", "error": str(e)})
+                continue
 
-        if "__interrupt__" in result:   # paused for approval, hand to Phase 2
-            to_review.append(item)
-        else:                           # no_trade or risk-gate rejected
-            log_decision(result)
+            if "__interrupt__" in result:   # paused for approval, hand to Phase 2
+                to_review.append(item)
+            else:                           # no_trade or risk-gate rejected
+                log_decision(result)
 
     # ---- Phase 2: review queue -----------------------------------------
     for item in sorted(to_review, key=lambda i: i["symbol"]):

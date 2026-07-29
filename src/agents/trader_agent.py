@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from risk_gate import run_risk_gate
 from langchain_core.tools import tool
 from langchain.agents import create_agent
-from llm import get_model
+from llm import get_model, TRANSIENT_API_ERRORS
 
 model = get_model("trader")
 
@@ -113,6 +113,13 @@ def trader_node(state: dict) -> dict:
         print(
             f"\n\nTrader agent decision : {proposal["structured_response"].action}\n\n")
     except Exception as e:
+        if isinstance(e, TRANSIENT_API_ERRORS):
+            # Don't handle it. A rate limit is not a trading decision - let it
+            # reach the retry in main.py, which waits out the window and
+            # resumes from the checkpoint.
+            print(
+                f"{state['symbol']} : trader hit {type(e).__name__}, propagating")
+            raise
         print(f"Error in trader agent {e}")
         proposal = Proposal(action="no_trade",
                             rationale=f"trader error: {e}", evidence_cited=[])
