@@ -20,7 +20,6 @@ class AgentState(TypedDict):
     market_outlook: dict
     technical_outlook: dict
     news_outlook: dict
-    events_outlook: dict
     proposal: dict
     risk_gate: dict
     decision: dict
