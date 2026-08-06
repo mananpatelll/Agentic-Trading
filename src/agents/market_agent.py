@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Literal
@@ -7,9 +8,10 @@ from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
 from llm import get_model
 
+log = logging.getLogger(__name__)
+
 MARKET_DIR = Path("data/market")
 model = get_model("market")
-print(f"model for market agent : {model.model_name}")
 search_tool = TavilySearch(max_results=10, topic="news",
                            time_range="week")  # recency locked
 
@@ -57,7 +59,7 @@ def get_market_outlook() -> dict:
     # Check if already exist
     cache = MARKET_DIR / f"{datetime.now():%Y-%m-%d}.json"
     if cache.exists():
-        print("loading market outlook frrom cache")
+        log.info("loading market outlook from cache")
         return json.loads(cache.read_text())
     outlook = analyze_market()  # if does not exists, anaylze it once per day
     cache.write_text(json.dumps(outlook, default=str))

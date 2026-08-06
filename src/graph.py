@@ -48,9 +48,6 @@ def load_data(state: AgentState) -> AgentState:
 
 
 def risk_gate_router(state: AgentState) -> str:
-    print("At the router")
-    print(
-        f"{"risk_gate" if state["proposal"]["action"] != "no_trade" else "skip"}")
     return "risk_gate" if state["proposal"]["action"] != "no_trade" else "skip"
 
 

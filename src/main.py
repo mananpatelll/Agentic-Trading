@@ -1,6 +1,7 @@
 import sys
 import glob
 import time
+import logging
 from typing import Any
 import pandas as pd
 from datetime import datetime
@@ -13,6 +14,16 @@ from agents.market_agent import get_market_outlook
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from load_config import load_config
+
+logging.basicConfig(
+    format="%(asctime)s %(levelname)-7s %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.INFO
+)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+log = logging.getLogger(__name__)
 
 
 def scan_csv() -> str:
@@ -93,10 +104,10 @@ def preflight(app, candidates: list[dict]) -> tuple[list[dict], list[dict]]:
 
         if status == "done":
             if not ask_yes_no(f"{symbol}: Already analyzed today, Do you want to analyze again?"):
-                print(f"skipping {symbol}")
+                log.info("skipping : %s", symbol)
                 continue
             # A finished thread can not re-run, so give it a new id and status
-            print("re-analyzing with a fresh thread")
+            log.info("re-analyzing with a fresh thread")
             config = thread_config(symbol, unique=True)
             status = "fresh"
 
@@ -104,7 +115,8 @@ def preflight(app, candidates: list[dict]) -> tuple[list[dict], list[dict]]:
             to_review.append({"symbol": symbol, "config": config})
         else:  # fresh | interrupted
             if status == "interrupted":
-                print(f"{symbol}: previous run died mid-execution, re-running")
+                log.info(
+                    " %s : previous run died mid-execution, re-running", symbol)
             to_analyze.append({"symbol": symbol, "config": config})
 
     return to_analyze, to_review
@@ -128,7 +140,8 @@ def analyze_candidate(app, item: dict, market_outlook: dict,
             if attempt == attempts:
                 raise
             wait = 30 * attempt
-            print(f"{item['symbol']} : rate limited, retrying in {wait}s")
+            log.warning("%s | rate limited, retry %d%d in %ds",
+                        item["symbol"], attempt, attempts, wait)
             time.sleep(wait)
             # Resume from the checkpoint rather than restarting. Nodes that
             # already succeeded must not re-run and spend their tokens twice,
@@ -139,13 +152,13 @@ def analyze_candidate(app, item: dict, market_outlook: dict,
 def run() -> None:
     app = build_graph()
     candidates = load_candidates(scan_csv())
-    print(F"Loaded {len(candidates)} candidates from today's scan")
+    log.info("loaded %d candidates", (len(candidates)))
 
     # ---- Phase 0: pre-flight -------------------------------------------
     to_analyze, to_review = preflight(app, candidates)
 
     if not to_analyze and not to_review:
-        print("Nothing to do.")
+        log.info("nothing to do")
         return
 
     market_outlook = None
@@ -153,11 +166,11 @@ def run() -> None:
         # Fetched exactly once, before any worker starts. Every worker is
         # handed this same dict, so nothing lazily initializes shared state.
         market_outlook = get_market_outlook()
-        print(
-            f"\nMARKET: {market_outlook['regime']} ({market_outlook['confidence']})\n")
+        log.info("market : %s (%s)",
+                 market_outlook["regime"], market_outlook['confidence'])
 
-    print(
-        f"analyzing {len(to_analyze)} | {len(to_review)} already awaiting approval")
+    log.info("analyzing %d | %d already waiting for approval",
+             len(to_analyze), len(to_review))
 
     # ---- Phase 1: concurrent analysis ----------------------------------
     workers = load_config().get("run", {}).get("max_workers", 3)
@@ -174,7 +187,7 @@ def run() -> None:
             try:
                 result = fut.result()
             except Exception as e:
-                print(f"{item['symbol']} : analysis failed - {e}")
+                log.exception("%s : analysis failed - %s", item['symbol'], e)
                 log_decision({"symbol": item["symbol"],
                               "status": "failed", "error": str(e)})
                 continue

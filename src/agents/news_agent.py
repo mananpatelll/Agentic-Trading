@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, Field
@@ -5,9 +6,12 @@ from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
 from llm import get_model
 
+
+log = logging.getLogger(__name__)
+
 search_tool = TavilySearch(max_results=5)
 model = get_model("news")
-print(f"model for news agent : {model.model_name}")
+log.info("model for news agent : %s", model.model_name)
 
 
 class NewsOutlook(BaseModel):
@@ -40,7 +44,7 @@ news_agent = create_agent(
 
 
 def news_node(state: dict) -> dict:
-    print(f"analyzing news for {state['symbol']}")
+    log.info("analyzing news for : %s", state['symbol'])
     msg = (
         f"Assess the news picture for {state["symbol"]} on a 1-5 day horizon.")
     result = news_agent.invoke(
@@ -48,5 +52,4 @@ def news_node(state: dict) -> dict:
         # hard cap under the prompt's soft cap
         config={"recursion_limit": 8},
     )
-    print(f"analyzed news for {state['symbol']}")
     return {"news_outlook": result["structured_response"].model_dump()}

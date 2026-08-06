@@ -1,3 +1,4 @@
+import logging
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from risk_gate import run_risk_gate
@@ -5,14 +6,17 @@ from langchain_core.tools import tool
 from langchain.agents import create_agent
 from llm import get_model, TRANSIENT_API_ERRORS
 
+log = logging.getLogger(__name__)
+
 model = get_model("trader")
 
 
 @tool
-def risk_gate(entry: float, stop: float, target: float, action: str) -> str:
+def risk_gate(symbol: str, entry: float, stop: float, target: float, action: str) -> str:
     """"
     Validate a proposed trade against risk rules.
     Parameters:
+    - symbol : the name of symbol
     - entry: the proposed entry price
     - stop: the stop loss price
     - target: the profit target price
@@ -23,7 +27,7 @@ def risk_gate(entry: float, stop: float, target: float, action: str) -> str:
     """
     proposal = {"entry": entry, "stop": stop,
                 "target": target, "action": action}
-    result = run_risk_gate(state={"proposal": proposal})
+    result = run_risk_gate(state={"symbol": symbol, "proposal": proposal})
     rg = result["risk_gate"]
     if rg["passed"]:
         return "Risk Gate PASSED"
@@ -106,21 +110,21 @@ def propose(state: dict) -> Proposal:
 
 
 def trader_node(state: dict) -> dict:
-    print(f"making trading decisons for {state['symbol']}")
+    log.info("making trading decisions for %s", state["symbol"])
     try:
         proposal = propose(state)
         proposal_dict = proposal["structured_response"].model_dump()
-        print(
-            f"\n\nTrader agent decision : {proposal["structured_response"].action}\n\n")
+        log.info("Trader agent decision for %s : %s", state["symbol"],
+                 proposal["structured_response"].action)
     except Exception as e:
         if isinstance(e, TRANSIENT_API_ERRORS):
             # Don't handle it. A rate limit is not a trading decision - let it
             # reach the retry in main.py, which waits out the window and
             # resumes from the checkpoint.
-            print(
-                f"{state['symbol']} : trader hit {type(e).__name__}, propagating")
+            log.warning("%s : trader hit %s, propagating",
+                        state['symbol'], type(e).__name__)
             raise
-        print(f"Error in trader agent {e}")
+        log.exception("Error in trader agent %s", e)
         proposal = Proposal(action="no_trade",
                             rationale=f"trader error: {e}", evidence_cited=[])
         proposal_dict = proposal.model_dump()

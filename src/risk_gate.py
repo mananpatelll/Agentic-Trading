@@ -1,8 +1,10 @@
 from load_config import load_config
+import logging
+
+log = logging.getLogger(__name__)
 
 CFG = load_config()
 CFG = CFG.get("Risk", {})
-print("CFG contents:", CFG)
 
 
 def rr_ratio(entry: float, stop: float, target: float, action: str, cfg=None) -> tuple[bool, str]:
@@ -41,6 +43,7 @@ def run_risk_gate(state: dict, cfg=None) -> dict:
     if cfg is None:
         cfg = CFG
     proposal = state.get("proposal", {})
+    symbol = state.get("symbol", {})
     if not proposal or proposal.get("action") == "no_trade":
         return {"risk_gate": {"passed": False, "reason": "No trade proposed.", "checks": {}}}
     required = ["entry", "stop", "target", "action"]
@@ -68,7 +71,8 @@ def run_risk_gate(state: dict, cfg=None) -> dict:
         reason = "All checks passed"
     else:
         reason = " | ".join(reasons)
-    print(f"\n\nRisk gate result {reason} \n {checks} \n\n")
+    log.info("risk gate results for %s: %s: %s",
+             symbol, reason, checks)
 
     return {
         "risk_gate": {

@@ -1,10 +1,12 @@
+import logging
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 from llm import get_model
 
+log = logging.getLogger(__name__)
 
 model = get_model("technical")
-print(f"model for technical agent : {model.model_name}")
+log.info("model for technical agent : %s", model.model_name)
 
 
 class Technical_outlook(BaseModel):
@@ -54,7 +56,6 @@ def analyze(snapshot: dict) -> Technical_outlook:
 
 
 def technical_node(state: dict) -> dict:
-    print(f"analyzing technical data for {state['symbol']}")
+    log.info("analyzing technical data for : %s", state['symbol'])
     outlook = analyze(state["market_snapshot"])
-    print(f"analyzed technical data for {state['symbol']}")
     return {"technical_outlook": outlook.model_dump()}
