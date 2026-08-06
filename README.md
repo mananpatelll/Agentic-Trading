@@ -63,7 +63,7 @@ Every candidate produces exactly one journal record: `no_trade`, `human_approved
 - [x] Approval queue — batch review of pending proposals after parallel runs
 - [x] Orchestration tests — routing, retry, and logging contract (pytest, no network)
 - [x] Structured logging — per-symbol attribution for concurrent runs
-- [ ] Eval suite — safety invariants, LLM-as-judge process scoring, frozen-snapshot regression set
+- [ ] Eval suite — safety invariants, frozen-snapshot regression set
 - [x] LangSmith tracing + session persistence
 - [ ] Dockerize (post-core-build)
 
