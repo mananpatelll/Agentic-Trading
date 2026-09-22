@@ -37,6 +37,7 @@ def fetch_daily_bars(symbols: list[str], lookback_days: int = 420) -> pd.DataFra
 def scan(universe: list[str], cfg: dict) -> pd.DataFrame:
     df = fetch_daily_bars(universe)
     candidates = []  # List to store scanned stocks
+    cfg = cfg["scanner"]
     for symbol in universe:
         try:
             d = df.xs(symbol, level="symbol")
